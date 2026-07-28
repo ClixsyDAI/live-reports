@@ -34,7 +34,19 @@ Two consequences to keep in mind:
 
 To update a published report at the same URL, pass its existing slug: `node build-report.mjs _src/whatever.html --slug a7f3c9e1b204`.
 
-Send the client the URL and the access code **through different channels**. A link and its code in one email means one forwarded email opens the report.
+## Sending it: two options
+
+The builder prints both. Choose per client.
+
+**Two-channel.** Send `https://clixsydai.github.io/live-reports/<slug>/` and give the code by another route, a call or a text. The client enters it once. Use this by default, and always for anything commercially sensitive.
+
+**One-click.** Send `https://clixsydai.github.io/live-reports/<slug>/#<code>` and the report opens with no prompt.
+
+The code sits in the URL fragment, after the `#`. Fragments are never transmitted to the server, so the code stays out of GitHub's access logs and out of `Referer` headers, and link scanners such as Outlook Safe Links or Slack unfurlers that fetch the URL receive only the gate page and cannot decrypt anything. The page clears the fragment from the address bar as soon as the report opens.
+
+What it costs: **the link becomes the credential.** One forwarded email hands over the report, and the code survives in the recipient's browser history and in any chat log the link is pasted into. It is the convenient option, not the safe one.
+
+Whichever you use, a link and its code in the same email is the worst of both, all of the convenience risk and none of the convenience.
 
 ## What the encryption does and does not do
 
