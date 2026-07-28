@@ -10,11 +10,17 @@
  * There is no plaintext in the repo, in git history, or in any HTTP response.
  *
  * Usage:
- *   node build-report.mjs _src/report.html 2026-07-client-topic
- *   node build-report.mjs _src/report.html 2026-07-client-topic --pass "..."
+ *   node build-report.mjs _src/report.html
+ *   node build-report.mjs _src/report.html --slug a7f3c9e1b204   # rebuild in place
+ *   node build-report.mjs _src/report.html --pass "..."          # non-interactive
  *
  * Omit --pass and you get a hidden prompt with confirmation, which keeps the
  * passphrase out of your shell history. Prefer that.
+ *
+ * The output folder name is random by default. This repo is public, so a
+ * descriptive slug like "2026-07-autoaccident-cro" would tell anyone browsing
+ * it who the client is and what was analysed, even though the report itself is
+ * encrypted. Record which slug belongs to which client in _src/INVENTORY.md.
  */
 
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -23,6 +29,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ITERATIONS = 600_000;
+const SITE = 'https://clixsydai.github.io/live-reports';
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const b64 = (buf) => Buffer.from(buf).toString('base64');
@@ -232,13 +239,26 @@ async function main() {
     argv.splice(flagAt, 2);
   }
 
-  const [input, slug] = argv;
-  if (!input || !slug) {
-    die('usage: node build-report.mjs <source.html> <slug> [--pass "..."]');
+  const slugAt = argv.indexOf('--slug');
+  let slug = null;
+  if (slugAt !== -1) {
+    slug = argv[slugAt + 1];
+    if (!slug) die('--slug given with no value');
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
+      die(`slug "${slug}" must be lowercase letters, digits and hyphens only`);
+    }
+    argv.splice(slugAt, 2);
   }
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(slug)) {
-    die(`slug "${slug}" must be lowercase letters, digits and hyphens only`);
+
+  const [input] = argv;
+  if (!input) {
+    die('usage: node build-report.mjs <source.html> [--slug <slug>] [--pass "..."]');
   }
+
+  // Random by default. A descriptive folder name would leak the client and the
+  // subject matter in a public repo, which defeats the point of encrypting.
+  const generated = slug === null;
+  if (generated) slug = Buffer.from(crypto.getRandomValues(new Uint8Array(6))).toString('hex');
 
   const plaintext = await readFile(resolve(input), 'utf8').catch(() => {
     die(`cannot read ${input}`);
@@ -260,11 +280,19 @@ async function main() {
   await writeFile(outFile, page(payload), 'utf8');
 
   const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
+  console.log('');
   console.log(`  source     ${kb(Buffer.byteLength(plaintext))}`);
   console.log(`  encrypted  ${kb(payload.ct.length)} (base64)`);
   console.log(`  kdf        PBKDF2-SHA256, ${ITERATIONS.toLocaleString('en-US')} iterations`);
   console.log(`  cipher     AES-256-GCM`);
+  console.log(`  slug       ${slug}${generated ? ' (generated)' : ''}`);
   console.log(`  written    ${outFile}`);
+  console.log('');
+  console.log(`  preview    http://localhost:8787/${slug}/`);
+  console.log(`  live       ${SITE}/${slug}/`);
+  console.log('');
+  console.log('  Record the client, slug and access code in _src/INVENTORY.md,');
+  console.log('  then commit and push. The code cannot be recovered if lost.');
 }
 
 main().catch((err) => die(err.stack || String(err)));
