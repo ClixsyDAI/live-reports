@@ -1,0 +1,14 @@
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Source documents. Publish the HTML, keep working files out of the repo.
+*.docx
+*.xlsx
+*.pptx
+~$*
+
+# Plaintext report sources. NEVER commit these: the whole point is that only
+# ciphertext reaches GitHub. Keep originals here locally and back them up
+# outside this repo.
+_src/
