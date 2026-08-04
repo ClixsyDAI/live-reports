@@ -32,7 +32,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ITERATIONS = 600_000;
-const SITE = 'https://clixsydai.github.io/live-reports';
+const SITE = 'https://reports.clixsy.com';
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const b64 = (buf) => Buffer.from(buf).toString('base64');

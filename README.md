@@ -4,7 +4,11 @@ Client-facing HTML reports published via GitHub Pages, so deliverables ship as a
 
 Every report is encrypted at rest with AES-256-GCM. GitHub only ever stores and serves ciphertext. The plaintext exists on the author's machine and in the client's browser after they enter the access code, nowhere else.
 
-**Live:** https://clixsydai.github.io/live-reports/
+**Live:** https://reports.clixsy.com/
+
+The site is served from the custom domain, not `clixsydai.github.io/live-reports/`. Binding a custom domain directly to a project repo serves it at the domain root, so the repository name does not appear in report URLs. Old `clixsydai.github.io/live-reports/<slug>/` links still resolve: GitHub 301-redirects them to the custom domain, and browsers carry the URL fragment across the redirect, so previously issued one-click links keep working.
+
+The `CNAME` file in the repo root holds the custom domain and is what binds it. GitHub wrote it when the domain was set in Settings. **Do not delete it.** Removing it unbinds the domain and the site reverts to the `github.io` URL, breaking every issued link. `build-report.mjs` only ever writes into `<slug>/`, so the normal publishing flow cannot touch it.
 
 ## This repo is public
 
@@ -38,9 +42,9 @@ To update a published report at the same URL, pass its existing slug: `node buil
 
 The builder prints both. Choose per client.
 
-**Two-channel.** Send `https://clixsydai.github.io/live-reports/<slug>/` and give the code by another route, a call or a text. The client enters it once. Use this by default, and always for anything commercially sensitive.
+**Two-channel.** Send `https://reports.clixsy.com/<slug>/` and give the code by another route, a call or a text. The client enters it once. Use this by default, and always for anything commercially sensitive.
 
-**One-click.** Send `https://clixsydai.github.io/live-reports/<slug>/#<code>` and the report opens with no prompt.
+**One-click.** Send `https://reports.clixsy.com/<slug>/#<code>` and the report opens with no prompt.
 
 The code sits in the URL fragment, after the `#`. Fragments are never transmitted to the server, so the code stays out of GitHub's access logs and out of `Referer` headers, and link scanners such as Outlook Safe Links or Slack unfurlers that fetch the URL receive only the gate page and cannot decrypt anything. The page clears the fragment from the address bar as soon as the report opens.
 
