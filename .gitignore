@@ -12,3 +12,8 @@ desktop.ini
 # ciphertext reaches GitHub. Keep originals here locally and back them up
 # outside this repo.
 _src/
+
+# Project changelog. Local only. It records which client got which slug, and
+# this repo is public, so committing it would publish the slug-to-client map
+# that the random slugs exist to hide.
+CHANGELOG.md
