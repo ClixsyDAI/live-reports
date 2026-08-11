@@ -33,6 +33,11 @@ import { fileURLToPath } from 'node:url';
 
 const ITERATIONS = 600_000;
 const SITE = 'https://reports.clixsy.com';
+// Open-analytics beacon endpoint (Cloudflare Worker, separate subdomain so the
+// grey-cloud Pages CNAME is untouched). Gate pages fire-and-forget to it on
+// view and on successful decrypt. Until the Worker is live the request fails
+// silently and the gate is unaffected.
+const BEACON = 'https://rp.clixsy.com/o';
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 const b64 = (buf) => Buffer.from(buf).toString('base64');
@@ -114,7 +119,7 @@ const FAVICON = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
  * The gate page deliberately names no client and no report. It is public, so
  * anything written here leaks. Keep it generic.
  */
-function page(payload) {
+function page(payload, slug) {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -229,6 +234,8 @@ function page(payload) {
 <script>
 (function () {
   var P = JSON.parse(document.getElementById('payload').textContent);
+  var BEACON = ${JSON.stringify(BEACON)};
+  var SLUG = ${JSON.stringify(slug)};
   var form = document.getElementById('gate');
   var input = document.getElementById('pass');
   var button = document.getElementById('go');
@@ -248,6 +255,35 @@ function page(payload) {
     return out;
   }
 
+  // Anonymous per-browser id so repeat opens can be told from new ones.
+  // Random hex in localStorage, shared across reports on this origin. No PII.
+  function anonId() {
+    try {
+      var v = localStorage.getItem('clxb');
+      if (!v) {
+        var a = crypto.getRandomValues(new Uint8Array(8)), s = '';
+        for (var i = 0; i < a.length; i++) s += ('0' + a[i].toString(16)).slice(-2);
+        localStorage.setItem('clxb', v = s);
+      }
+      return v;
+    } catch (e) { return null; }
+  }
+
+  // Fire-and-forget open analytics. text/plain string body means no CORS
+  // preflight, and delivery does not depend on the response. Never throws,
+  // never blocks or breaks the gate if the endpoint is down.
+  function ping(event) {
+    try {
+      var tag = null;
+      try { tag = new URLSearchParams(location.search).get('r'); } catch (e) {}
+      var d = JSON.stringify({ e: event, s: SLUG, r: tag, b: anonId() });
+      if (!(navigator.sendBeacon && navigator.sendBeacon(BEACON, d))) {
+        fetch(BEACON, { method: 'POST', body: d, keepalive: true, mode: 'no-cors' }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+  ping('view');
+
   async function decrypt(pass) {
     var material = await crypto.subtle.importKey(
       'raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']
@@ -265,6 +301,7 @@ function page(payload) {
   }
 
   function render(html) {
+    ping('open');
     // Drop the code from the address bar before painting, so it is not sitting
     // on screen and does not travel if the client copies the URL onward. It
     // stays in browser history regardless, that is unavoidable.
@@ -273,9 +310,14 @@ function page(payload) {
     }
     // document.write is required rather than innerHTML: the reports carry
     // inline <script> tags, and innerHTML-inserted scripts never execute.
-    document.open();
-    document.write(html);
-    document.close();
+    // The short defer gives the queued beacon a moment before this document
+    // is replaced; sendBeacon should survive that, but it is unconfirmed for
+    // same-document replacement, and 60ms is invisible here.
+    setTimeout(function () {
+      document.open();
+      document.write(html);
+      document.close();
+    }, 60);
   }
 
   function showForm(message) {
@@ -374,7 +416,7 @@ async function main() {
   const outDir = resolve(HERE, slug);
   await mkdir(outDir, { recursive: true });
   const outFile = resolve(outDir, 'index.html');
-  await writeFile(outFile, page(payload), 'utf8');
+  await writeFile(outFile, page(payload, slug), 'utf8');
 
   const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
   console.log('');
